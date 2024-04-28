@@ -1,4 +1,5 @@
 galaxy_info:
+  role_name: fad_health_check
   author: ndkprd
   description: Ansible role to manage FortiADC health check resources via REST API.
 
