@@ -1,0 +1,50 @@
+---
+
+- name: Update/create FortiADC Resources.
+  hosts: all
+  become: false
+  gather_facts: false
+  connection: local
+  vars:
+     # for testing-purpose only, to delete the created resources after. change to 'false' if you want the resource to stay.
+    do_cleanup: true
+    # system health-check entries
+    fad_health_checks:
+      - name: LB_HLTHCK_TCP_80
+        type: tcp
+        port: 80
+        dest_addr_type: ipv4
+        dest_addr_ipv4: 0.0.0.0
+        dest_addr_ipv6: '::'
+        up_retry: 1
+        down_retry: 3
+        interval: 10
+        timeout: 5
+      - name: LB_HLTHCK_TCP_443
+        type: tcp
+        port: 443
+        dest_addr_type: ipv4
+        dest_addr: 0.0.0.0
+        up_retry: 1
+        down_retry: 3
+        interval: 10
+        timeout: 5
+
+  roles:
+    - ndkprd.fad_health_check
+
+  tasks:
+    - name: Clean up the created health check resources.
+      ansible.builtin.uri:
+        method: DELETE
+        url: "https://{{ ansible_host }}/api/system_health_check?vdom={{ fad_vdom }}&mkey={{ item.name }}"
+        body_format: "{{ fad_api_uri_params.body_format }}"
+        validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+        return_content: "{{ fad_api_uri_params.return_content }}"
+        status_code: "{{ fad_api_uri_params.status_code }}"
+        headers: "{{ fad_api_header }}"
+      when: do_cleanup
+      loop: "{{ fad_health_checks }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags: [cleanup, fad_health_check]

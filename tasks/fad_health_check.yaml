@@ -1,0 +1,221 @@
+- name: Print out the Health Checks existing values.
+  ansible.builtin.debug:
+    msg: >
+      {{ (lookup('url', fad_health_check_api_endpoint
+      % (health_check.name),
+      validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
+  loop: "{{ fad_health_checks }}"
+  loop_control:
+    loop_var: health_check
+    label: "{{ health_check.name }}"
+  tags: [debug]
+
+- name: Create new Health Checks entry if it's not found.
+  ansible.builtin.uri:
+    method: POST
+    url: "{{ fad_health_check_api_endpoint | format(health_check.name) }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    # curently only TCP and ICMP are able to be managed from vars
+    body: |
+      {
+      "mkey": "{{ health_check.name | string }}",
+      "type": "{{ health_check.type | string }}",
+      "interval": "{{ health_check.interval | default('5') | string }}",
+      "timeout": "{{ health_check.timeout | default('3') | string }}",
+      "up_retry": "{{ health_check.up_retry | default('1') | string }}",
+      "down_retry": "{{ health_check.down_retry | default('3') | string }}",
+      "dest_addr_type": "{{ health_check.dest_addr_type | default('ipv4') | string }}",
+      "dest_addr": "{{ health_check.dest_addr_ipv4 | default('0.0.0.0') | string }}",
+      "dest_addr6": "{{ health_check.dest_addr_ipv6 | default('::') | string }}",
+      "send_string": "/",
+      "receive_string": "receive-string",
+      "status_code": "200",
+      "match_type": "match_string",
+      "method_type": "http_head",
+      "addr_type": "ipv4",
+      "host_addr6": "::",
+      "http_version": "http_1.1",
+      "folder": "INBOX",
+      "file": "welcome.txt",
+      "passive": "enable",
+      "cpu": "96",
+      "mem": "96",
+      "disk": "96",
+      "agent-type": "UCD",
+      "version": "v1",
+      "http_connect": "no_connect",
+      "compare-type": "less",
+      "cpu-weight": "100",
+      "mem-weight": "100",
+      "disk-weight": "100",
+      "sip_request_type": "register",
+      "allow-ssl-version": "sslv3 tlsv1.0 tlsv1.1 tlsv1.2",
+      "ssl-ciphers": [
+          "DHE-RSA-AES256-GCM-SHA384",
+          "DHE-RSA-AES256-SHA256",
+          "DHE-RSA-AES256-SHA",
+          "AES256-GCM-SHA384",
+          "AES256-SHA256",
+          "AES256-SHA",
+          "DHE-RSA-AES128-GCM-SHA256",
+          "DHE-RSA-AES128-SHA256",
+          "DHE-RSA-AES128-SHA",
+          "AES128-GCM-SHA256",
+          "AES128-SHA256",
+          "AES128-SHA",
+          "RC4-SHA",
+          "RC4-MD5",
+          "EDH-RSA-DES-CBC3-SHA",
+          "DES-CBC3-SHA"
+      ],
+      "rtsp-method-type": "options",
+      "mysql-server-type": "primary",
+      "radius-reject": "disable",
+      "vendor-id": "12356",
+      "product-name": "FortiADC",
+      "host-ip-addr": "0.0.0.0",
+      "host-ip6-addr": "::",
+      "connect-type": "service_name",
+      "port": "{{ health_check.port | string }}"
+      }
+  register: fad_health_check_post_results
+  loop: "{{ fad_health_checks }}"
+  loop_control:
+    loop_var: health_check
+    label: "{{ health_check.name }}"
+  when: >
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload').mkey is undefined
+  changed_when: "fad_health_check_post_results.json.payload == 0"
+  failed_when: fad_health_check_post_results.json.payload not in [0, -15]
+  ignore_errors: true
+
+- name: Update Health Check entry if it's exist and any of its value is changed.
+  ansible.builtin.uri:
+    method: PUT
+    url: "{{ fad_health_check_api_endpoint | format(health_check.name) }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    body: |
+      {
+      "mkey": "{{ health_check.name | string }}"
+      "type": "{{ health_check.type | string }}",
+      "interval": "{{ health_check.interval | default('5') | string }}",
+      "timeout": "{{ health_check.timeout | default('3') | string }}",
+      "up_retry": "{{ health_check.up_retry | default('1') | string }}",
+      "down_retry": "{{ health_check.down_retry | default('3') | string }}",
+      "dest_addr_type": "{{ health_check.dest_addr_type | default('ipv4') | string }}",
+      "dest_addr": "{{ health_check.dest_addr_ipv4 | default('0.0.0.0') | string }}",
+      "dest_addr6": "{{ health_check.dest_addr_ipv6 | default('::') | string }}",
+      "send_string": "/",
+      "receive_string": "receive-string",
+      "status_code": "200",
+      "match_type": "match_string",
+      "method_type": "http_head",
+      "addr_type": "ipv4",
+      "host_addr6": "::",
+      "http_version": "http_1.1",
+      "folder": "INBOX",
+      "file": "welcome.txt",
+      "passive": "enable",
+      "cpu": "96",
+      "mem": "96",
+      "disk": "96",
+      "agent-type": "UCD",
+      "version": "v1",
+      "http_connect": "no_connect",
+      "compare-type": "less",
+      "cpu-weight": "100",
+      "mem-weight": "100",
+      "disk-weight": "100",
+      "sip_request_type": "register",
+      "allow-ssl-version": "sslv3 tlsv1.0 tlsv1.1 tlsv1.2",
+      "ssl-ciphers": [
+          "DHE-RSA-AES256-GCM-SHA384",
+          "DHE-RSA-AES256-SHA256",
+          "DHE-RSA-AES256-SHA",
+          "AES256-GCM-SHA384",
+          "AES256-SHA256",
+          "AES256-SHA",
+          "DHE-RSA-AES128-GCM-SHA256",
+          "DHE-RSA-AES128-SHA256",
+          "DHE-RSA-AES128-SHA",
+          "AES128-GCM-SHA256",
+          "AES128-SHA256",
+          "AES128-SHA",
+          "RC4-SHA",
+          "RC4-MD5",
+          "EDH-RSA-DES-CBC3-SHA",
+          "DES-CBC3-SHA"
+      ],
+      "rtsp-method-type": "options",
+      "mysql-server-type": "primary",
+      "radius-reject": "disable",
+      "vendor-id": "12356",
+      "product-name": "FortiADC",
+      "host-ip-addr": "0.0.0.0",
+      "host-ip6-addr": "::",
+      "connect-type": "service_name",
+      "port": "{{ health_check.port | string }}"
+      }
+  register: fad_health_check_put_results
+  loop: "{{ fad_health_checks }}"
+  loop_control:
+    loop_var: health_check
+    label: "{{ health_check.name }}"
+  when: >
+    (
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['mkey'] is defined) and
+    (
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['type'] != health_check.type | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['interval'] != health_check.interval | default('5') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['timeout'] != health_check.timeout | default('3') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['up_retry'] != health_check.up_retry | default('1') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['down_retry'] != health_check.down_retry | default('3') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['dest_addr_type'] != health_check.dest_addr_type | default('ipv4') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['dest_addr'] != health_check.dest_addr_ipv4 | default('0.0.0.0') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['dest_addr6'] != health_check.dest_addr_ipv6 | default('::') | string or
+    (lookup('url', fad_health_check_api_endpoint
+    % (health_check.name), validate_certs=false, split_lines=false,
+    headers=fad_api_header) | from_json).get('payload')['port'] != health_check.port | string
+    )
+  changed_when: "fad_health_check_put_results.json.payload == 0"
+  failed_when: "fad_health_check_put_results.json.payload != 0 and fad_health_check_put_results.json.payload != -15"
+
+- name: Print out the Health Checks values after create/update task.
+  ansible.builtin.debug:
+    msg: >
+      {{ (lookup('url', fad_health_check_api_endpoint
+      % (health_check.name),
+      validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
+  loop: "{{ fad_health_checks }}"
+  loop_control:
+    loop_var: health_check
+    label: "{{ health_check.name }}"
+  tags: [debug]
