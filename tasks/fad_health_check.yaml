@@ -1,221 +1,250 @@
-- name: Print out the Health Checks existing values.
+---
+
+- name: Gather current FAD Health Check facts and save them into a var named 'existing_hc_facts'.
+  ansible.builtin.uri:
+    method: GET
+    url: "{{ fad_api_endpoint.health_check }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+  register: existing_hc_facts
+  tags: [get]
+
+- name: Debug out the value of 'existing_hc_facts' var.
   ansible.builtin.debug:
-    msg: >
-      {{ (lookup('url', fad_health_check_api_endpoint
-      % (health_check.name),
-      validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
-  loop: "{{ fad_health_checks }}"
-  loop_control:
-    loop_var: health_check
-    label: "{{ health_check.name }}"
+    var: existing_hc_facts.json.payload
+  tags: [get, debug]
+
+- name: Debug out the list of entry name/mkeys from 'existing_hc_facts'.
+  vars:
+    existing_hc_list: "{{ existing_hc_facts.json.payload | map(attribute='mkey') }}"
+  ansible.builtin.debug:
+    var: existing_hc_list
   tags: [debug]
 
-- name: Create new Health Checks entry if it's not found.
+- name: Create new Health Checks entry if the entry not exist.
+  vars:
+    existing_hc_list: "{{ existing_hc_facts.json.payload | map(attribute='mkey') }}"
   ansible.builtin.uri:
     method: POST
-    url: "{{ fad_health_check_api_endpoint | format(health_check.name) }}"
+    url: "{{ fad_api_endpoint.health_check }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"
     status_code: "{{ fad_api_uri_params.status_code }}"
     headers: "{{ fad_api_header }}"
     # curently only TCP and ICMP are able to be managed from vars
-    body: |
+    body: >
       {
-      "mkey": "{{ health_check.name | string }}",
-      "type": "{{ health_check.type | string }}",
-      "interval": "{{ health_check.interval | default('5') | string }}",
-      "timeout": "{{ health_check.timeout | default('3') | string }}",
-      "up_retry": "{{ health_check.up_retry | default('1') | string }}",
-      "down_retry": "{{ health_check.down_retry | default('3') | string }}",
-      "dest_addr_type": "{{ health_check.dest_addr_type | default('ipv4') | string }}",
-      "dest_addr": "{{ health_check.dest_addr_ipv4 | default('0.0.0.0') | string }}",
-      "dest_addr6": "{{ health_check.dest_addr_ipv6 | default('::') | string }}",
-      "send_string": "/",
-      "receive_string": "receive-string",
-      "status_code": "200",
-      "match_type": "match_string",
-      "method_type": "http_head",
-      "addr_type": "ipv4",
-      "host_addr6": "::",
-      "http_version": "http_1.1",
-      "folder": "INBOX",
-      "file": "welcome.txt",
-      "passive": "enable",
-      "cpu": "96",
-      "mem": "96",
-      "disk": "96",
-      "agent-type": "UCD",
-      "version": "v1",
-      "http_connect": "no_connect",
-      "compare-type": "less",
-      "cpu-weight": "100",
-      "mem-weight": "100",
-      "disk-weight": "100",
-      "sip_request_type": "register",
-      "allow-ssl-version": "sslv3 tlsv1.0 tlsv1.1 tlsv1.2",
-      "ssl-ciphers": [
-          "DHE-RSA-AES256-GCM-SHA384",
-          "DHE-RSA-AES256-SHA256",
-          "DHE-RSA-AES256-SHA",
-          "AES256-GCM-SHA384",
-          "AES256-SHA256",
-          "AES256-SHA",
-          "DHE-RSA-AES128-GCM-SHA256",
-          "DHE-RSA-AES128-SHA256",
-          "DHE-RSA-AES128-SHA",
-          "AES128-GCM-SHA256",
-          "AES128-SHA256",
-          "AES128-SHA",
-          "RC4-SHA",
-          "RC4-MD5",
-          "EDH-RSA-DES-CBC3-SHA",
-          "DES-CBC3-SHA"
-      ],
-      "rtsp-method-type": "options",
-      "mysql-server-type": "primary",
-      "radius-reject": "disable",
-      "vendor-id": "12356",
-      "product-name": "FortiADC",
-      "host-ip-addr": "0.0.0.0",
-      "host-ip6-addr": "::",
-      "connect-type": "service_name",
-      "port": "{{ health_check.port | string }}"
+        "mkey": "{{ hc.name | string }}",
+        "type": "{{ hc.type | default('http') | string }}",
+        "interval": "{{ hc.interval | default('5') | string }}",
+        "timeout": "{{ hc.timeout | default('3') | string }}",
+        "up_retry": "{{ hc.up_retry | default('1') | string }}",
+        "down_retry": "{{ hc.down_retry | default('3') | string }}",
+        "dest_addr_type": "{{ hc.dest_addr_type | default('ipv4') | string }}",
+        "dest_addr": "{{ hc.dest_addr_ipv4 | default('0.0.0.0') | string }}",
+        "dest_addr6": "{{ hc.dest_addr_ipv6 | default('::') | string }}",
+        "send_string": "{{ hc.send_string | default("/") | string }}",
+        "receive_string": "{{ hc.receive_string | default("receive-string") | string }}",
+        "status_code": "{{ hc.status_code | default('200') | string }}",
+        "match_type": "{{ hc.match_type | default('match_string') | string }}",
+        "method_type": "{{ hc.method_type | default('http_head') | string }}",
+        "addr_type": "{{ hc.addr_type | default('ipv4') | string }}",
+        "host_addr": "{{ hc.host_addr | default('0.0.0.0') | string }}",
+        "host_addr6": "{{ hc.host_addr6 | default('::') | string }}",
+        "hostname": "{{ hc.hostname | default('') | string }}",
+        "http_version": "{{ hc.http_version | default('http_1.1') | string }}",
+        "folder": "{{ hc.folder | default('INBOX') | string }}",
+        "file": "{{ hc.file | default('welcome.txt') | string }}",
+        "passive": "{{ hc.passive | default('enable') | string }}",
+        "cpu": "{{ hc.cpu | default('96') | string }}",
+        "mem": "{{ hc.mem | default('96') | string }}",
+        "disk": "{{ hc.disk | default('96') | string }}",
+        "agent-type": "{{ hc.agent_type | default('UCD') | string }}",
+        "version": "{{ hc.version | default('v1') | string }}",
+        "http_connect": "{{ hc.http_connect | default('no_connect') | string }}",
+        "compare-type": "{{ hc.compare_type | default('less') | string }}",
+        "cpu-weight": "{{ hc.cpu_weight | default('100') | string }}",
+        "mem-weight": "{{ hc.mem_weight | default('100') | string }}",
+        "disk-weight": "{{ hc.disk_weight | default('100') | string }}",
+        "sip_request_type": "{{ hc.sip_request_type | default('register') | string }}",
+        "allow-ssl-version": "{{ hc.allow_ssl_version | default('sslv3 tlsv1.0 tlsv1.1 tlsv1.2') | string }}",
+        "ssl-ciphers": "{{ hc.ssl_ciphers | default(fad_hc_ssl_cipher) }}",
+        "rtsp-method-type": "{{ hc.rtsp_method_type | default('options') | string }}",
+        "mysql-server-type": "{{ hc.mysql_server_type | default('primary') | string }}",
+        "radius-reject": "{{ hc.radius_reject | default('disable') | string }}",
+        "vendor-id": "{{ hc.vendor_id | default('12356') | string }}",
+        "product-name": "{{ hc.product_name | default('FortiADC') | string }}",
+        "host-ip-addr": "{{ hc.host_ip_addr | default('0.0.0.0') | string }}",
+        "host-ip6-addr": "{{ hc.host_ip6_addr | default('::') | string }}",
+        "connect-type": "{{ hc.connect_type | default('service_name') | string }}",
+        "port": "{{ hc.port | default('0') | string }}"
       }
-  register: fad_health_check_post_results
+  register: hc_create_results
   loop: "{{ fad_health_checks }}"
   loop_control:
-    loop_var: health_check
-    label: "{{ health_check.name }}"
-  when: >
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload').mkey is undefined
-  changed_when: "fad_health_check_post_results.json.payload == 0"
-  failed_when: fad_health_check_post_results.json.payload not in [0, -15]
-  ignore_errors: true
+    loop_var: hc
+    label: "{{ hc.name }}"
+  when: hc.name not in existing_hc_list
+  changed_when: hc_create_results.json.payload == 0
+  failed_when: hc_create_results.json.payload not in [0, -15]
+  tags: [post]
 
-- name: Update Health Check entry if it's exist and any of its value is changed.
+- name: Debug out FAD Health Check create results.
+  ansible.builtin.debug:
+    msg: "{{ hc_create_results }}"
+  tags: [debug]
+
+- name: Regather FAD Health Check facts.
   ansible.builtin.uri:
-    method: PUT
-    url: "{{ fad_health_check_api_endpoint | format(health_check.name) }}"
+    method: GET
+    url: "{{ fad_api_endpoint.health_check }}"
     body_format: "{{ fad_api_uri_params.body_format }}"
     validate_certs: "{{ fad_api_uri_params.validate_certs }}"
     return_content: "{{ fad_api_uri_params.return_content }}"
     status_code: "{{ fad_api_uri_params.status_code }}"
     headers: "{{ fad_api_header }}"
-    body: |
+  register: hc_regather_results
+  tags: [get]
+
+- name: Debut out FAD Health Check regather results.
+  ansible.builtin.debug:
+    msg: "{{ hc_regather_results.json.payload }}"
+  tags: [debug]
+
+- name: Update FAD Health Checks entry if the entry config changed.
+  vars:
+    hc_regather_facts: "{{ hc_regather_results.json.payload }}"
+    query: "[?mkey=='%s'].%s | [0]"
+  ansible.builtin.uri:
+    method: PUT
+    url: "{{ fad_api_endpoint.health_check }}&mkey={{ hc.name | string }}"
+    body_format: "{{ fad_api_uri_params.body_format }}"
+    validate_certs: "{{ fad_api_uri_params.validate_certs }}"
+    return_content: "{{ fad_api_uri_params.return_content }}"
+    status_code: "{{ fad_api_uri_params.status_code }}"
+    headers: "{{ fad_api_header }}"
+    # curently only TCP and ICMP are able to be managed from vars
+    body: >
       {
-      "mkey": "{{ health_check.name | string }}"
-      "type": "{{ health_check.type | string }}",
-      "interval": "{{ health_check.interval | default('5') | string }}",
-      "timeout": "{{ health_check.timeout | default('3') | string }}",
-      "up_retry": "{{ health_check.up_retry | default('1') | string }}",
-      "down_retry": "{{ health_check.down_retry | default('3') | string }}",
-      "dest_addr_type": "{{ health_check.dest_addr_type | default('ipv4') | string }}",
-      "dest_addr": "{{ health_check.dest_addr_ipv4 | default('0.0.0.0') | string }}",
-      "dest_addr6": "{{ health_check.dest_addr_ipv6 | default('::') | string }}",
-      "send_string": "/",
-      "receive_string": "receive-string",
-      "status_code": "200",
-      "match_type": "match_string",
-      "method_type": "http_head",
-      "addr_type": "ipv4",
-      "host_addr6": "::",
-      "http_version": "http_1.1",
-      "folder": "INBOX",
-      "file": "welcome.txt",
-      "passive": "enable",
-      "cpu": "96",
-      "mem": "96",
-      "disk": "96",
-      "agent-type": "UCD",
-      "version": "v1",
-      "http_connect": "no_connect",
-      "compare-type": "less",
-      "cpu-weight": "100",
-      "mem-weight": "100",
-      "disk-weight": "100",
-      "sip_request_type": "register",
-      "allow-ssl-version": "sslv3 tlsv1.0 tlsv1.1 tlsv1.2",
-      "ssl-ciphers": [
-          "DHE-RSA-AES256-GCM-SHA384",
-          "DHE-RSA-AES256-SHA256",
-          "DHE-RSA-AES256-SHA",
-          "AES256-GCM-SHA384",
-          "AES256-SHA256",
-          "AES256-SHA",
-          "DHE-RSA-AES128-GCM-SHA256",
-          "DHE-RSA-AES128-SHA256",
-          "DHE-RSA-AES128-SHA",
-          "AES128-GCM-SHA256",
-          "AES128-SHA256",
-          "AES128-SHA",
-          "RC4-SHA",
-          "RC4-MD5",
-          "EDH-RSA-DES-CBC3-SHA",
-          "DES-CBC3-SHA"
-      ],
-      "rtsp-method-type": "options",
-      "mysql-server-type": "primary",
-      "radius-reject": "disable",
-      "vendor-id": "12356",
-      "product-name": "FortiADC",
-      "host-ip-addr": "0.0.0.0",
-      "host-ip6-addr": "::",
-      "connect-type": "service_name",
-      "port": "{{ health_check.port | string }}"
+        "mkey": "{{ hc.name | string }}",
+        "type": "{{ hc.type | default('http') | string }}",
+        "interval": "{{ hc.interval | default('5') | string }}",
+        "timeout": "{{ hc.timeout | default('3') | string }}",
+        "up_retry": "{{ hc.up_retry | default('1') | string }}",
+        "down_retry": "{{ hc.down_retry | default('3') | string }}",
+        "dest_addr_type": "{{ hc.dest_addr_type | default('ipv4') | string }}",
+        "dest_addr": "{{ hc.dest_addr_ipv4 | default('0.0.0.0') | string }}",
+        "dest_addr6": "{{ hc.dest_addr_ipv6 | default('::') | string }}",
+        "send_string": "{{ hc.send_string | default("/") | string }}",
+        "receive_string": "{{ hc.receive_string | default("receive-string") | string }}",
+        "status_code": "{{ hc.status_code | default('200') | string }}",
+        "match_type": "{{ hc.match_type | default('match_string') | string }}",
+        "method_type": "{{ hc.method_type | default('http_head') | string }}",
+        "addr_type": "{{ hc.addr_type | default('ipv4') | string }}",
+        "host_addr": "{{ hc.host_addr | default('0.0.0.0') | string }}",
+        "host_addr6": "{{ hc.host_addr6 | default('::') | string }}",
+        "hostname": "{{ hc.hostname | default('') | string }}",
+        "http_version": "{{ hc.http_version | default('http_1.1') | string }}",
+        "folder": "{{ hc.folder | default('INBOX') | string }}",
+        "file": "{{ hc.file | default('welcome.txt') | string }}",
+        "passive": "{{ hc.passive | default('enable') | string }}",
+        "cpu": "{{ hc.cpu | default('96') | string }}",
+        "mem": "{{ hc.mem | default('96') | string }}",
+        "disk": "{{ hc.disk | default('96') | string }}",
+        "agent-type": "{{ hc.agent_type | default('UCD') | string }}",
+        "version": "{{ hc.version | default('v1') | string }}",
+        "http_connect": "{{ hc.http_connect | default('no_connect') | string }}",
+        "compare-type": "{{ hc.compare_type | default('less') | string }}",
+        "cpu-weight": "{{ hc.cpu_weight | default('100') | string }}",
+        "mem-weight": "{{ hc.mem_weight | default('100') | string }}",
+        "disk-weight": "{{ hc.disk_weight | default('100') | string }}",
+        "sip_request_type": "{{ hc.sip_request_type | default('register') | string }}",
+        "allow-ssl-version": "{{ hc.allow_ssl_version | default('sslv3 tlsv1.0 tlsv1.1 tlsv1.2 ') | string }}",
+        "ssl-ciphers": "{{ hc.ssl_ciphers | default(fad_hc_ssl_cipher) }}",
+        "rtsp-method-type": "{{ hc.rtsp_method_type | default('options') | string }}",
+        "mysql-server-type": "{{ hc.mysql_server_type | default('primary') | string }}",
+        "radius-reject": "{{ hc.radius_reject | default('disable') | string }}",
+        "vendor-id": "{{ hc.vendor_id | default('12356') | string }}",
+        "product-name": "{{ hc.product_name | default('FortiADC') | string }}",
+        "host-ip-addr": "{{ hc.host_ip_addr | default('0.0.0.0') | string }}",
+        "host-ip6-addr": "{{ hc.host_ip6_addr | default('::') | string }}",
+        "connect-type": "{{ hc.connect_type | default('service_name') | string }}",
+        "port": "{{ hc.port | default('0') | string }}"
       }
-  register: fad_health_check_put_results
+  register: hc_update_results
   loop: "{{ fad_health_checks }}"
   loop_control:
-    loop_var: health_check
-    label: "{{ health_check.name }}"
+    loop_var: hc
+    label: "{{ hc.name }}"
   when: >
-    (
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['mkey'] is defined) and
-    (
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['type'] != health_check.type | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['interval'] != health_check.interval | default('5') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['timeout'] != health_check.timeout | default('3') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['up_retry'] != health_check.up_retry | default('1') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['down_retry'] != health_check.down_retry | default('3') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['dest_addr_type'] != health_check.dest_addr_type | default('ipv4') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['dest_addr'] != health_check.dest_addr_ipv4 | default('0.0.0.0') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['dest_addr6'] != health_check.dest_addr_ipv6 | default('::') | string or
-    (lookup('url', fad_health_check_api_endpoint
-    % (health_check.name), validate_certs=false, split_lines=false,
-    headers=fad_api_header) | from_json).get('payload')['port'] != health_check.port | string
-    )
-  changed_when: "fad_health_check_put_results.json.payload == 0"
-  failed_when: "fad_health_check_put_results.json.payload != 0 and fad_health_check_put_results.json.payload != -15"
+    ((hc.type | default('icmp') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"type\"')))) or
+    ((hc.interval | default('5') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"interval\"')))) or
+    ((hc.timeout | default('3') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"timeout\"')))) or
+    ((hc.up_retry | default('1') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"up_retry\"')))) or
+    ((hc.down_retry | default('3') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"down_retry\"')))) or
+    ((hc.dest_addr_type | default('ipv4') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"dest_addr_type\"')))) or
+    ((hc.dest_addr_ipv4 | default('0.0.0.0') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"dest_addr\"')))) or
+    ((hc.dest_addr_ipv6 | default('::') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"dest_addr6\"')))) or
+    ((hc.send_string | default('/') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"send_string\"')))) or
+    ((hc.receive_string | default('receive-string') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"receive_string\"')))) or
+    ((hc.status_code | default('200') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"status_code\"')))) or
+    ((hc.match_type | default('match_string') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"match_type\"')))) or
+    ((hc.method_type | default('http_head') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"method_type\"')))) or
+    ((hc.addr_type | default('ipv4') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"addr_type\"')))) or
+    ((hc.host_addr | default('0.0.0.0') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"host_addr\"')))) or
+    ((hc.host_addr6 | default('::') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"host_addr6\"')))) or
+    ((hc.hostname | default('') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"hostname\"')))) or
+    ((hc.http_version | default('http_1.1') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"http_version\"')))) or
+    ((hc.folder | default('INBOX') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"folder\"')))) or
+    ((hc.file | default('welcome.txt') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"file\"')))) or
+    ((hc.passive | default('enable') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"passive\"')))) or
+    ((hc.cpu | default('96') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"cpu\"')))) or
+    ((hc.mem | default('96') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"mem\"')))) or
+    ((hc.disk | default('96') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"disk\"')))) or
+    ((hc.agent_type | default('UCD') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"agent-type\"')))) or
+    ((hc.version | default('v1') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"version\"')))) or
+    ((hc.http_connect | default('no_connect') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"http_connect\"')))) or
+    ((hc.compare_type | default('less') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"compare-type\"')))) or
+    ((hc.cpu_weight | default('100') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"cpu-weight\"')))) or
+    ((hc.mem_weight | default('100') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"mem-weight\"')))) or
+    ((hc.disk_weight | default('100') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"disk-weight\"')))) or
+    ((hc.sip_request_type | default('register') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"sip_request_type\"')))) or
+    ((hc.allow_ssl_version | default('sslv3 tlsv1.0 tlsv1.1 tlsv1.2') | trim | string) !=
+      (hc_regather_facts | json_query(query % (hc.name, '\"allow-ssl-version\"')) | trim | string)) or
+    ((hc.ssl_ciphers | default(fad_hc_ssl_ciphers) | join(' ') | trim | string) !=
+      (hc_regather_facts | json_query(query % (hc.name, '\"ssl-ciphers\"')) | trim | string)) or
+    ((hc.rtsp_method_type | default('options') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"rtsp-method-type\"')))) or
+    ((hc.mysql_server_type | default('primary') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"mysql-server-type\"')))) or
+    ((hc.radius_reject | default('disable') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"radius-reject\"')))) or
+    ((hc.vendor_id | default('12356') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"vendor-id\"')))) or
+    ((hc.product_name | default('FortiADC') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"product-name\"')))) or
+    ((hc.host_ip_addr | default('0.0.0.0') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"host-ip-addr\"')))) or
+    ((hc.host_ip6_addr | default('::') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"host-ip6-addr\"')))) or
+    ((hc.connect_type | default('service_name') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"connect-type\"')))) or
+    ((hc.port | default('0') | string) != (hc_regather_facts | json_query(query % (hc.name, '\"port\"'))))
+  changed_when: hc_update_results.json.payload == 0
+  failed_when: hc_update_results.json.payload != 0
+  tags: [put]
+
+- name: Debug out the value of FAD Health Check update results.
+  ansible.builtin.debug:
+    msg: "{{ hc_update_results }}"
+  tags: [debug]
 
 - name: Print out the Health Checks values after create/update task.
   ansible.builtin.debug:
     msg: >
-      {{ (lookup('url', fad_health_check_api_endpoint
-      % (health_check.name),
-      validate_certs=false, split_lines=false, headers=fad_api_header) | from_json).get('payload') }}
+      {{
+        (lookup('url', fad_api_endpoint.health_check % (hc.name),
+        validate_certs=false, split_lines=false, headers=fad_api_header)
+        | from_json).get('payload')
+      }}
   loop: "{{ fad_health_checks }}"
   loop_control:
-    loop_var: health_check
-    label: "{{ health_check.name }}"
+    loop_var: hc
+    label: "{{ hc.name }}"
   tags: [debug]

@@ -1,9 +1,9 @@
 ---
 
-fad_base_url: "https://{{ ansible_host }}/api"
+fad_api_base_url: "https://{{ ansible_host }}:{{ fad_https_port }}/api"
 
 fad_api_endpoint:
-  health_check: "/system_health_check?vdom={{ fad_vdom }}&mkey=%s"
+  health_check: "{{ fad_api_base_url }}/system_health_check?vdom={{ fad_vdom }}"
 
 fad_api_uri_params:
   body_format: json
@@ -14,3 +14,21 @@ fad_api_uri_params:
 fad_api_header:
   'Content-Type': 'application/json'
   'APITOKEN': '{{ fad_apitoken }}'
+
+fad_hc_ssl_ciphers:
+  - "DHE-RSA-AES256-GCM-SHA384"
+  - "DHE-RSA-AES256-SHA256"
+  - "DHE-RSA-AES256-SHA"
+  - "AES256-GCM-SHA384"
+  - "AES256-SHA256"
+  - "AES256-SHA"
+  - "DHE-RSA-AES128-GCM-SHA256"
+  - "DHE-RSA-AES128-SHA256"
+  - "DHE-RSA-AES128-SHA"
+  - "AES128-GCM-SHA256"
+  - "AES128-SHA256"
+  - "AES128-SHA"
+  - "RC4-SHA"
+  - "RC4-MD5"
+  - "EDH-RSA-DES-CBC3-SHA"
+  - "DES-CBC3-SHA"
