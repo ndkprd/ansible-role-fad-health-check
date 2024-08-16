@@ -1,7 +1,5 @@
 ---
 
-- name: Import create/update health check task.
+- name: Add/update FAD Health Checks configuration.
   ansible.builtin.import_tasks: fad_health_check.yaml
-  vars:
-    fad_health_check_api_endpoint: "{{ fad_base_url + fad_api_endpoint.health_check }}"
   tags: [fad_health_check]
