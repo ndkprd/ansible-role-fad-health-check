@@ -6,45 +6,59 @@
   gather_facts: false
   connection: local
   vars:
-     # for testing-purpose only, to delete the created resources after. change to 'false' if you want the resource to stay.
-    do_cleanup: true
-    # system health-check entries
     fad_health_checks:
-      - name: LB_HLTHCK_TCP_80
-        type: tcp
-        port: 80
-        dest_addr_type: ipv4
-        dest_addr_ipv4: 0.0.0.0
+      # minimum example for HTTP L7 health checks
+      - name: LB_HLTHCK_HTTP_app1-ndkprd-com
+        type: http
+        hostname: app1.ndkprd.com
+      # complete example for HTTP L7 health checks
+      # other than 'type', which have default value of 'icmp', all the value
+      # of the parameter in here is actually the default value that will be used
+      # if the parameter is omitted
+      - name: LB_HLTHCK_HTTP_app2-ndkprd-com
+        hostname: 'app2.ndkprd.com'
+        type: 'http'
+        interval: '5'
+        timeout: '3'
+        up_retry: '1'
+        down_retry: '3'
+        dest_addr_type: 'ipv4'
+        dest_addr_ipv4: '0.0.0.0'
         dest_addr_ipv6: '::'
-        up_retry: 1
-        down_retry: 3
-        interval: 10
-        timeout: 5
-      - name: LB_HLTHCK_TCP_443
-        type: tcp
-        port: 443
-        dest_addr_type: ipv4
-        dest_addr: 0.0.0.0
-        up_retry: 1
-        down_retry: 3
-        interval: 10
-        timeout: 5
+        send_string: '/'
+        receive_string: 'receive-string'
+        status_code: '200'
+        match_type: 'match_string'
+        method_type: 'http_head'
+        addr_type: 'ipv4'
+        host_addr: '0.0.0.0'
+        host_addr6: '::'
+        http_version: 'http_1.1'
+        folder: 'INBOX'
+        file: 'welcome.txt'
+        passive: 'enable'
+        cpu: '96'
+        mem: '96'
+        disk: '96'
+        agent_type: 'UCD'
+        version: 'v1'
+        http_connect: 'no_connect'
+        compare_type: 'less'
+        cpu_weight: '100'
+        mem_weight: '100'
+        disk_weight: '100'
+        sip_request_type: 'register'
+        allow_ssl_version: 'sslv3 tlsv1.0 tlsv1.1 tlsv1.2'
+        ssl_ciphers: "{{ fad_hc_ssl_ciphers }}" # check the value in vars/main.yaml
+        rtsp_method_type: 'options'
+        mysql_server_type: 'primary'
+        radius_reject: 'disable'
+        vendor_id: '12356'
+        product_name: 'FortiADC'
+        host_ip_addr: '0.0.0.0'
+        host_ip6_addr: '::'
+        connect_type: 'service_name'
+        port: '0'
 
   roles:
     - ndkprd.fad_health_check
-
-  tasks:
-    - name: Clean up the created health check resources.
-      ansible.builtin.uri:
-        method: DELETE
-        url: "https://{{ ansible_host }}/api/system_health_check?vdom={{ fad_vdom }}&mkey={{ item.name }}"
-        body_format: "{{ fad_api_uri_params.body_format }}"
-        validate_certs: "{{ fad_api_uri_params.validate_certs }}"
-        return_content: "{{ fad_api_uri_params.return_content }}"
-        status_code: "{{ fad_api_uri_params.status_code }}"
-        headers: "{{ fad_api_header }}"
-      when: do_cleanup
-      loop: "{{ fad_health_checks }}"
-      loop_control:
-        label: "{{ item.name }}"
-      tags: [cleanup, fad_health_check]
