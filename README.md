@@ -15,7 +15,7 @@ fad1.ndkprd.com ansible_host=fad1.ndkprd.com
 
 ### Playbook Example
 
-Check out [tests/] folder.
+Check out [tests](tests/) folder.
 
 ### About Tags
 
