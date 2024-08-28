@@ -239,12 +239,8 @@
   ansible.builtin.debug:
     msg: >
       {{
-        (lookup('url', fad_api_endpoint.health_check % (hc.name),
+        (lookup('url', fad_api_endpoint.health_check,
         validate_certs=false, split_lines=false, headers=fad_api_header)
         | from_json).get('payload')
       }}
-  loop: "{{ fad_health_checks }}"
-  loop_control:
-    loop_var: hc
-    label: "{{ hc.name }}"
   tags: [debug]
